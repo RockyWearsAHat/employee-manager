@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS department (
 CREATE TABLE IF NOT EXISTS role (
     id int PRIMARY KEY NOT NULL AUTO_INCREMENT,
     title varchar(30),
-    salary decimal,
+    salary decimal(10,2),
     department_id int,
     FOREIGN KEY (department_id) REFERENCES department(id) ON DELETE SET NULL
 );
