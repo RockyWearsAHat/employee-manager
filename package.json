@@ -1,0 +1,19 @@
+{
+  "name": "employee-managment-system",
+  "version": "1.0.0",
+  "description": "A project for managing employees in a company",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "setup": "node setup.js"
+  },
+  "author": "Rocky",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "inquirer": "^9.2.12",
+    "mysql2": "^3.7.0",
+    "nodemon": "^3.0.2"
+  }
+}
