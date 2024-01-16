@@ -1,15 +1,28 @@
 import inquirer from "inquirer";
 import express from "express";
 import mysql from "mysql2";
+import dotenv from "dotenv";
+import util from "util";
+import chalk from "chalk";
 
 const app = new express();
+dotenv.config();
 
 const conn = mysql.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "",
-  database: "company_db",
+  host: process.env.db_hostname,
+  user: process.env.db_username,
+  password: process.env.db_password,
 });
+const promisedQuery = util.promisify(conn.query).bind(conn);
+
+try {
+  await promisedQuery("USE company_db;");
+} catch (err) {
+  console.clear();
+  console.log(`${chalk.red(err + ", have you run 'npm run setup'?")}`);
+  process.exit();
+}
+console.log("testing");
 
 console.clear();
 const webAppOrCLI = await inquirer.prompt({

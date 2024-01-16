@@ -1,6 +1,8 @@
 import mysql from "mysql2";
 import inquirer from "inquirer";
 import fs from "fs";
+import dotenv from "dotenv";
+import chalk from "chalk";
 
 console.clear();
 const delOrSetup = await inquirer.prompt({
@@ -17,22 +19,25 @@ if (delOrSetup.choice == "Setup Database")
 else if (delOrSetup.choice == "Delete Database")
   queryToExe = fs.readFileSync(`${process.cwd()}/src/db/wipe.sql`).toString();
 
+dotenv.config();
 const conn = mysql.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "",
+  host: process.env.db_hostname,
+  user: process.env.db_username,
+  password: process.env.db_password,
   multipleStatements: true,
 });
 
 conn.query(queryToExe, (err, res) => {
   if (err) {
-    console.log(err);
+    console.log(`${chalk.red(err)}`);
     process.exit();
   } else {
-    for (let i = 0; i < res.length; i++) {
-      if (i <= 2) continue;
-      console.log(res[i]);
+    if (delOrSetup.choice == "Setup Database") {
+      console.log(chalk.green("Database Has Been Configured"));
+    } else {
+      console.log(chalk.green("Database Has Been Deleted"));
     }
+
     process.exit();
   }
 });
