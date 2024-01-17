@@ -19,6 +19,93 @@ const cleanSQLString = (string) => {
     .join("");
 };
 
+import { Console } from "console";
+import { Transform } from "stream";
+
+function writeTable(input) {
+  if (typeof input === "string") input = JSON.parse(input);
+
+  // @see https://stackoverflow.com/a/67859384
+  // Shoutout to https://stackoverflow.com/questions/49618069/remove-index-from-console-table#answer-69874540
+  const ts = new Transform({
+    transform(chunk, enc, cb) {
+      cb(null, chunk);
+    },
+  });
+
+  const logger = new Console({ stdout: ts });
+  logger.table(input);
+  const table = (ts.read() || "").toString();
+  let result = "";
+  let rowLength = 0;
+  for (let row of table.split(/[\r\n]+/)) {
+    let r = row.replace(/[^┬]*┬/, "┌");
+    r = r.replace(/^├─*┼/, "├");
+    r = r.replace(/│[^│]*/, "");
+    r = r.replace(/^└─*┴/, "└");
+    r = r.replace(/'/g, " ");
+    result += `${r}\n`;
+    if (r.length != 0) rowLength = r.length;
+  }
+
+  //Rewrap with colors
+  let res = "";
+  let splitString = result.split("");
+  for (let i = 0; i < splitString.length; i++) {
+    if (String(splitString[i]).match(/[a-zA-Z0-9.]/)) {
+      if (i >= rowLength * 2) res += chalk.green(splitString[i]);
+      else res += chalk.blue(splitString[i]);
+    } else {
+      res += splitString[i];
+    }
+  }
+
+  console.log(res.trim());
+}
+
+const displaySQLTable = (arr) => {
+  // console.log(arr);
+  let keys = Object.keys(arr[0]);
+  let parsedKeyVals = [];
+  keys.forEach((key) => {
+    let keyParts = key.split("_");
+    let rtnKey = "";
+    for (let i = 0; i < keyParts.length; i++) {
+      if (i > 0) rtnKey += " "; //Add a space if after first word
+      rtnKey +=
+        keyParts[i].substring(0, 1).toUpperCase() + keyParts[i].substring(1); //Split first char from string and capitalize, then add rest
+    }
+
+    parsedKeyVals.push(rtnKey);
+  });
+  // console.log(parsedKeyVals);
+
+  let tableData = "[";
+  for (let i = 0; i < arr.length; i++) {
+    let vals = Object.values(arr[i]);
+
+    let obj = "{";
+    for (let j = 0; j < vals.length; j++) {
+      if (j > 0) obj += ", ";
+      if (typeof vals[j] == "string") {
+        obj += `"${parsedKeyVals[j]}": "${vals[j]}"`;
+      } else {
+        obj += `"${parsedKeyVals[j]}": ${vals[j]}`;
+      }
+    }
+    obj.substring(0, obj.length - 2);
+    obj += "}";
+
+    if (i > 0) tableData += ", ";
+    tableData += JSON.stringify(JSON.parse(obj));
+    // console.log(tableData);
+  }
+  tableData.substring(0, tableData.length - 2);
+  tableData += "]";
+
+  writeTable(tableData);
+};
+
 //Basically the same as the function above only the passed param may be a number so convert to string first + 0-9 check in regex
 //and a . as well for decimals
 const cleanSQLStringWithNums = (string) => {
@@ -60,7 +147,6 @@ console.clear();
 
 //Set up view route for department, role, and employee tables
 app.get("/api/view/:viewType", async (req, res) => {
-  console.log(cleanSQLString(req.params.viewType));
   let queryRes = await promisedQuery(
     `SELECT * FROM ${cleanSQLString(req.params.viewType)};`
   );
@@ -71,7 +157,6 @@ app.get("/api/view/:viewType", async (req, res) => {
 //Set up post route for department, role, and employee tables
 app.post("/api/create/:dataType", async (req, res) => {
   let dataType = cleanSQLString(req.params.dataType);
-  console.log(dataType);
 
   let columnNames;
   let values;
@@ -125,7 +210,6 @@ app.post("/api/create/:dataType", async (req, res) => {
       break;
   }
 
-  console.log(columnNames, values);
   try {
     await promisedQuery(
       `INSERT INTO ${dataType} ${columnNames} VALUES ${values};`
@@ -183,7 +267,7 @@ const webAppOrCLI = await inquirer.prompt({
   name: "choice",
   type: "list",
   message: "How would you like to run this app?",
-  choices: ["Web App", "Command Line Interface"],
+  choices: ["Command Line Interface", "Web App"],
 });
 
 //Setup for web app
@@ -193,10 +277,10 @@ if (webAppOrCLI.choice == "Web App") {
   app.use(express.static(`${process.cwd()}/src/pages/`));
   app.use(express.static(`${process.cwd()}/src/scripts/`));
 
-  app.get("*", (req, res, next) => {
-    console.log(`${req.protocol}://${req.get("host")}${req.originalUrl}`);
-    next();
-  });
+  // app.get("*", (req, res, next) => {
+  //   console.log(`${req.protocol}://${req.get("host")}${req.originalUrl}`);
+  //   next();
+  // });
 
   app.get("/", (req, res) => {
     res.sendFile("homepage/homepage.html", { root: "src/pages" });
@@ -217,7 +301,7 @@ if (webAppOrCLI.choice == "Web App") {
       type: "list",
       name: "choice",
       message: "What would you like to do?",
-      choices: ["View"],
+      choices: ["View", "Clear Console"],
     });
 
     switch (action.choice) {
@@ -226,8 +310,12 @@ if (webAppOrCLI.choice == "Web App") {
           type: "list",
           name: "choice",
           message: "Which table would you like to view?",
-          choices: ["Departments", "Roles", "Employees"],
+          choices: ["Departments", "Roles", "Employees", "<= Back"],
         });
+
+        if (table.choice == "<= Back") {
+          break;
+        }
 
         let tableName = String(table.choice)
           .toLowerCase()
@@ -236,7 +324,14 @@ if (webAppOrCLI.choice == "Web App") {
         let res = await fetch(`${baseFetchUrl}/api/view/${tableName}`);
 
         let json = await res.json();
-        console.log(json);
+        if (typeof json != "string") {
+          displaySQLTable(json);
+        } else {
+          console.log(chalk.red(json));
+        }
+        break;
+      case "Clear Console":
+        console.clear();
         break;
     }
   }
